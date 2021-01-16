@@ -1,0 +1,50 @@
+#include "./filter.hpp"
+
+#include <omp.h>
+
+// ============================================================================
+
+exec_time_t openmp_sharpen(int THREADS, string input_file, string output_file)
+{
+    omp_set_num_threads(THREADS);
+
+    auto start = chrono::high_resolution_clock::now();
+
+    auto image = parse_input(input_file);
+
+    auto N = image.size();
+    auto M = image.front().size();
+    auto result = image_t(N, ivec_t(M));
+    auto i = 0u, j = 0u;
+
+    #pragma omp parallel for schedule(static)
+    for (auto i = 1u; i < N - 1u; ++i)
+        #pragma omp parallel for schedule(static)
+        for (auto j = 1u; j < M - 1u; ++j)
+        {
+            auto aux = ftrip_t(0.0f);
+
+            for (auto x: {-1, 0, 1})
+                for (auto y: {-1, 0, 1})
+                    aux += image[i + x][j + y] * filter[1 - x][1 - y];
+
+            if (aux.first  < 0) aux.first  = 0;
+            if (aux.second < 0) aux.second = 0;
+            if (aux.third  < 0) aux.third  = 0;
+
+            if (aux.first  > 255) aux.first  = 255;
+            if (aux.second > 255) aux.second = 255;
+            if (aux.third  > 255) aux.third  = 255;
+
+            result[i][j] = aux;
+        }
+
+    write_image(output_file, result);
+
+    auto stop = chrono::high_resolution_clock::now();
+    auto time = chrono::duration<exec_time_t>(stop - start);
+
+    return time.count();
+}
+
+// ============================================================================
